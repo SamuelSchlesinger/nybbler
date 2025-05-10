@@ -271,11 +271,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Welcome message
     println!("{}", style("Welcome to Terminal Nybbler!").bold().green());
     println!("Take care of your virtual pet and keep it happy!");
+    println!("{}", style("You can create a new pet or load an existing one by name!").italic());
     println!();
 
-    // Ask for a name
+    // Ask for a name (or to load an existing Nybbler)
     let name = dialoguer::Input::<String>::new()
-        .with_prompt("What would you like to name your Nybbler?")
+        .with_prompt("Enter your Nybbler's name (new or existing)")
         .interact_text()?;
 
     // Check if a save exists and ask if we should load it
