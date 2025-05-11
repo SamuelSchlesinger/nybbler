@@ -3,12 +3,16 @@ use std::thread;
 use std::path::PathBuf;
 use std::fs;
 use std::io::{self, ErrorKind};
+use std::process;
 use dialoguer::{Select, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
 use console::{Term, style};
 use chrono::{DateTime, Local};
 use serde::{Serialize, Deserialize};
 use dirs::data_dir;
+use clap::{Parser, Subcommand};
+
+mod characters;
 
 // States that the Nybbler can be in
 #[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -35,6 +39,7 @@ impl NybblerMood {
         }
     }
 
+#[allow(dead_code)]
     fn get_animation(&self) -> Vec<&str> {
         match self {
             NybblerMood::Happy => vec!["(⌦ᕔ ᕕ ᕔ⌦)", "(⌦ᕔ‿ᕔ⌦)", "(⌦ᕔ ᕕ ᕔ⌦)", "(⌦ᕔ‿ᕔ⌦)"],
@@ -60,6 +65,8 @@ struct Nybbler {
     #[serde(with = "chrono_serde")]
     last_updated: DateTime<Local>,
     mood: NybblerMood,
+    #[serde(default = "characters::CharacterType::random")]
+    character_type: characters::CharacterType,
 }
 
 // Helper module to serialize/deserialize chrono::DateTime
@@ -99,6 +106,7 @@ impl Nybbler {
             age: 0,
             last_updated: Local::now(),
             mood: NybblerMood::Happy,
+            character_type: characters::CharacterType::random(),
         }
     }
 
@@ -233,6 +241,45 @@ fn get_save_directory() -> io::Result<PathBuf> {
     Ok(save_dir)
 }
 
+// Delete all Nybbler save files
+fn delete_all_nybblers() -> io::Result<usize> {
+    let save_dir = get_save_directory()?;
+
+    // Make sure the directory exists
+    if !save_dir.exists() {
+        return Ok(0);
+    }
+
+    let mut count = 0;
+    for entry in fs::read_dir(save_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        // Only delete JSON files
+        if path.extension().map_or(false, |ext| ext == "json") {
+            fs::remove_file(path)?;
+            count += 1;
+        }
+    }
+
+    Ok(count)
+}
+
+// Command line arguments structure
+#[derive(Parser)]
+#[command(name = "nybbler")]
+#[command(about = "🎮 Nybbler: The Terminal Virtual Pet 🐙", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Delete all Nybbler pets
+    DeleteAll,
+}
+
 fn display_stats(nybbler: &Nybbler, term: &Term) -> Result<(), std::io::Error> {
     term.clear_screen()?;
 
@@ -257,11 +304,12 @@ fn display_stats(nybbler: &Nybbler, term: &Term) -> Result<(), std::io::Error> {
 
     println!("{} {}", style(nybbler.mood.to_emoji()).bold(), style(mood_text).italic());
 
-    // Display a cute ASCII animation based on mood
-    let mood_animation = nybbler.mood.get_animation();
-    for frame in mood_animation.iter().take(1) {
-        println!("{}", style(*frame).bold().yellow());
-    }
+    // Display the pixelated character
+    let character_display = match nybbler.mood {
+        NybblerMood::Sleeping => nybbler.character_type.sleeping(),
+        _ => nybbler.character_type.neutral(),
+    };
+    println!("{}", style(character_display).bold().yellow());
 
     println!();
 
@@ -305,6 +353,25 @@ fn display_stats(nybbler: &Nybbler, term: &Term) -> Result<(), std::io::Error> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Parse command line arguments
+    let cli = Cli::parse();
+
+    // Handle commands
+    if let Some(Commands::DeleteAll) = cli.command {
+        match delete_all_nybblers() {
+            Ok(count) => {
+                println!("🗑️ Successfully deleted {} Nybbler pets!", count);
+                println!("🎮 Run the game without arguments to create a new pet.");
+                return Ok(());
+            },
+            Err(e) => {
+                eprintln!("Error deleting Nybblers: {}", e);
+                process::exit(1);
+            }
+        }
+    }
+
+    // Regular game flow
     let term = Term::stdout();
     term.clear_screen()?;
 
@@ -396,9 +463,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     thread::sleep(Duration::from_millis(300));
                     term.clear_last_lines(1)?;
                     println!("{} Nom nom nom... {} is eating! {}", style("🍽️").bold(), style(&nybbler.name).bold().yellow(), style("🍽️").bold());
+                    println!("{}", style(nybbler.character_type.eating()).bold().yellow());
                     thread::sleep(Duration::from_millis(300));
-                    term.clear_last_lines(1)?;
+                    term.clear_last_lines(2)?;
                     println!("{} Yummy! That was delicious! {}", style("😋").bold(), style("😋").bold());
+                    println!("{}", style(nybbler.character_type.neutral()).bold().yellow());
                 }
             },
             1 => {
@@ -408,9 +477,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     thread::sleep(Duration::from_millis(300));
                     term.clear_last_lines(1)?;
                     println!("{} Wheee! {} is having fun! {}", style("🎯").bold(), style(&nybbler.name).bold().yellow(), style("🎯").bold());
+                    println!("{}", style(nybbler.character_type.playing()).bold().yellow());
                     thread::sleep(Duration::from_millis(300));
-                    term.clear_last_lines(1)?;
+                    term.clear_last_lines(2)?;
                     println!("{} Bouncing around with joy! {}", style("🏀").bold(), style("🏀").bold());
+                    println!("{}", style(nybbler.character_type.neutral()).bold().yellow());
                 }
             },
             2 => {
@@ -420,9 +491,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     thread::sleep(Duration::from_millis(400));
                     term.clear_last_lines(1)?;
                     println!("{} Zzz... {} is sleeping soundly... {}", style("😴").bold(), style(&nybbler.name).bold().yellow(), style("😴").bold());
+                    println!("{}", style(nybbler.character_type.sleeping()).bold().yellow());
                     thread::sleep(Duration::from_millis(400));
-                    term.clear_last_lines(1)?;
+                    term.clear_last_lines(2)?;
                     println!("{} Dreaming of treats and toys... {}", style("💭").bold(), style("💭").bold());
+                    println!("{}", style(nybbler.character_type.sleeping()).bold().yellow());
                 }
             },
             3 => {
@@ -432,9 +505,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     thread::sleep(Duration::from_millis(300));
                     term.clear_last_lines(1)?;
                     println!("{} {} is recovering... {}", style("🌡️").bold(), style(&nybbler.name).bold().yellow(), style("🌡️").bold());
+                    println!("{}", style(nybbler.character_type.healing()).bold().yellow());
                     thread::sleep(Duration::from_millis(300));
-                    term.clear_last_lines(1)?;
+                    term.clear_last_lines(2)?;
                     println!("{} All better now! Healthy and strong! {}", style("💪").bold(), style("💪").bold());
+                    println!("{}", style(nybbler.character_type.neutral()).bold().yellow());
                 }
             },
             4 => {
