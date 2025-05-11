@@ -18,6 +18,8 @@ enum NybblerMood {
     Sad,
     Sick,
     Sleeping,
+    Excited,
+    Playful,
 }
 
 impl NybblerMood {
@@ -28,6 +30,20 @@ impl NybblerMood {
             NybblerMood::Sad => "😢",
             NybblerMood::Sick => "🤒",
             NybblerMood::Sleeping => "😴",
+            NybblerMood::Excited => "🤩",
+            NybblerMood::Playful => "😋",
+        }
+    }
+
+    fn get_animation(&self) -> Vec<&str> {
+        match self {
+            NybblerMood::Happy => vec!["(⌦ᕔ ᕕ ᕔ⌦)", "(⌦ᕔ‿ᕔ⌦)", "(⌦ᕔ ᕕ ᕔ⌦)", "(⌦ᕔ‿ᕔ⌦)"],
+            NybblerMood::Neutral => vec!["(・ω・)", "(・ω・)", "(・ω・)", "(・ω・)"],
+            NybblerMood::Sad => vec!["(╥_╥)", "(╥︣_╥︭)", "(╥_╥)", "(╥︣_╥︭)"],
+            NybblerMood::Sick => vec!["(˘_˘)", "(˘_˘)", "(˘_˘)", "(*￣m￣)"],
+            NybblerMood::Sleeping => vec!["(-.-)zzz", "(-_-)zzz", "(-.-)zzz", "(-_-)zzz"],
+            NybblerMood::Excited => vec!["(★^O^★)", "(☆^ー^☆)", "(★^O^★)", "(☆^ー^☆)"],
+            NybblerMood::Playful => vec!["(◕ᗜ◕✿)", "(◠‿◠✿)", "(◕ᗜ◕✿)", "(◠‿◠✿)"],
         }
     }
 }
@@ -158,8 +174,12 @@ impl Nybbler {
             self.mood = NybblerMood::Sleeping;
         } else if self.hunger < 30 || self.happiness < 30 {
             self.mood = NybblerMood::Sad;
+        } else if self.hunger > 70 && self.happiness > 70 && self.energy > 70 {
+            self.mood = NybblerMood::Excited;
         } else if self.hunger > 70 && self.happiness > 70 {
             self.mood = NybblerMood::Happy;
+        } else if self.happiness > 80 {
+            self.mood = NybblerMood::Playful;
         } else {
             self.mood = NybblerMood::Neutral;
         }
@@ -216,48 +236,68 @@ fn get_save_directory() -> io::Result<PathBuf> {
 fn display_stats(nybbler: &Nybbler, term: &Term) -> Result<(), std::io::Error> {
     term.clear_screen()?;
 
-    // Display header
-    println!("{}", style(format!("{} the Nybbler  Age: {} days", nybbler.name, nybbler.age)).bold());
-    println!("{} {}", nybbler.mood.to_emoji(), match nybbler.mood {
-        NybblerMood::Happy => "I'm happy!",
-        NybblerMood::Neutral => "I'm doing okay.",
-        NybblerMood::Sad => "I'm feeling sad...",
-        NybblerMood::Sick => "I don't feel well...",
-        NybblerMood::Sleeping => "Zzz...",
-    });
+    // Display fancy header with border
+    let header = format!("✨ {} the Nybbler ✨  Age: {} days 🎂", nybbler.name, nybbler.age);
+    let border = "•*´¨`*•.¸¸.•*´¨`*•.¸¸.•*´¨`*•.¸¸.•*´¨`*•.¸¸.•";
+
+    println!("{}", style(border).cyan());
+    println!("{}", style(header).bold().magenta());
+    println!("{}", style(border).cyan());
+
+    // Display animated mood
+    let mood_text = match nybbler.mood {
+        NybblerMood::Happy => "💖 I'm happy! 💖",
+        NybblerMood::Neutral => "🌱 I'm doing okay. 🌱",
+        NybblerMood::Sad => "💧 I'm feeling sad... 💧",
+        NybblerMood::Sick => "🌡️ I don't feel well... 💊",
+        NybblerMood::Sleeping => "💤 Zzz... 💤",
+        NybblerMood::Excited => "✨ I'm super excited! ✨",
+        NybblerMood::Playful => "🎮 Let's play! 🎮",
+    };
+
+    println!("{} {}", style(nybbler.mood.to_emoji()).bold(), style(mood_text).italic());
+
+    // Display a cute ASCII animation based on mood
+    let mood_animation = nybbler.mood.get_animation();
+    for frame in mood_animation.iter().take(1) {
+        println!("{}", style(*frame).bold().yellow());
+    }
+
     println!();
 
-    // Display stats bars
-    let bar_style = ProgressStyle::with_template("[{bar:20.green/red}] {pos}/{len}")
-        .unwrap()
-        .progress_chars("█▉▊▋▌▍▎▏ ");
+    // Display stats bars with cute emojis
+    let get_bar_style = |emoji: &str| {
+        ProgressStyle::with_template(&format!("{}  [{{bar:20.green/red}}] {{pos}}/{{len}}", emoji))
+            .unwrap()
+            .progress_chars("█▉▊▋▌▍▎▏ ")
+    };
 
     // Hunger
     let hunger_bar = ProgressBar::new(100);
-    hunger_bar.set_style(bar_style.clone());
+    hunger_bar.set_style(get_bar_style("🍔"));
     hunger_bar.set_position(nybbler.hunger as u64);
-    println!("Hunger:    ");
+    println!("{}:", style("Hunger").bold().blue());
     hunger_bar.tick();
 
     // Happiness
     let happiness_bar = ProgressBar::new(100);
-    happiness_bar.set_style(bar_style.clone());
+    happiness_bar.set_style(get_bar_style("🎈"));
     happiness_bar.set_position(nybbler.happiness as u64);
-    println!("Happiness: ");
+    println!("{}:", style("Happiness").bold().magenta());
     happiness_bar.tick();
 
     // Energy
     let energy_bar = ProgressBar::new(100);
-    energy_bar.set_style(bar_style.clone());
+    energy_bar.set_style(get_bar_style("⚡"));
     energy_bar.set_position(nybbler.energy as u64);
-    println!("Energy:    ");
+    println!("{}:", style("Energy").bold().yellow());
     energy_bar.tick();
 
     // Health
     let health_bar = ProgressBar::new(100);
-    health_bar.set_style(bar_style);
+    health_bar.set_style(get_bar_style("💖"));
     health_bar.set_position(nybbler.health as u64);
-    println!("Health:    ");
+    println!("{}:", style("Health").bold().red());
     health_bar.tick();
 
     println!();
@@ -268,10 +308,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let term = Term::stdout();
     term.clear_screen()?;
 
-    // Welcome message
+    // Welcome message with cute ASCII art
+    println!("{}", style("
+     /\\_/\\
+    ( o.o )
+     > ^ <
+  ✨ NYBBLER ✨").bold().yellow());
     println!("{}", style("Welcome to Terminal Nybbler!").bold().green());
-    println!("Take care of your virtual pet and keep it happy!");
-    println!("{}", style("You can create a new pet or load an existing one by name!").italic());
+    println!("{}", style("🌈 Take care of your virtual pet and keep it happy! 🌈").cyan());
+    println!("{}", style("✨ You can create a new pet or load an existing one by name! ✨").italic().magenta());
     println!();
 
     // Ask for a name (or to load an existing Nybbler)
@@ -289,8 +334,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if load_save {
             match Nybbler::load(&name) {
                 Ok(loaded) => {
-                    println!("{} has been loaded!", name);
-                    println!("Time has passed since you last played...");
+                    println!("{} {} has been loaded! {}", style("🎉").bold(), style(&name).bold().yellow(), style("🎉").bold());
+                    println!("{} Time has passed since you last played... {}", style("⏰").bold(), style("⏰").bold());
                     thread::sleep(Duration::from_millis(1500));
                     loaded
                 },
@@ -318,46 +363,86 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Check if nybbler is alive
         if !nybbler.is_alive() {
             term.clear_screen()?;
-            println!("{}", style("Oh no! Your Nybbler has died!").bold().red());
-            println!("It lived for {} days.", nybbler.age);
+            println!("{}", style("
+      .======.
+      | RIP |
+      |      |
+      |      |
+      |      |
+      '======'").bold());
+            println!("{}", style("💔 Oh no! Your Nybbler has passed away! 💔").bold().red());
+            println!("🌈 {} lived for {} wonderful days with you. 🌈", nybbler.name, nybbler.age);
+            println!("🌟 Thank you for taking care of your Nybbler! 🌟");
             break;
         }
 
         // Display stats
         display_stats(&nybbler, &term)?;
 
-        // Show available actions
-        let options = vec!["Feed", "Play", "Sleep", "Heal", "Exit"];
+        // Show available actions with cute emojis
+        let options = vec!["🍔 Feed", "🎮 Play", "💤 Sleep", "💊 Heal", "👋 Exit"];
         let selection = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("What would you like to do?")
+            .with_prompt("✨ What would you like to do? ✨")
             .items(&options)
             .default(0)
             .interact_on(&term)?;
 
-        // Process selection
+        // Process selection with cute responses
         match selection {
             0 => {
                 nybbler.feed();
-                println!("You fed {}!", nybbler.name);
+                println!("{} You fed {} a delicious meal! 🍔 Yum yum! {}", style("🎉").bold(), style(&nybbler.name).bold().yellow(), style("🎉").bold());
+                for _ in 0..3 {
+                    thread::sleep(Duration::from_millis(300));
+                    term.clear_last_lines(1)?;
+                    println!("{} Nom nom nom... {} is eating! {}", style("🍽️").bold(), style(&nybbler.name).bold().yellow(), style("🍽️").bold());
+                    thread::sleep(Duration::from_millis(300));
+                    term.clear_last_lines(1)?;
+                    println!("{} Yummy! That was delicious! {}", style("😋").bold(), style("😋").bold());
+                }
             },
             1 => {
                 nybbler.play();
-                println!("You played with {}!", nybbler.name);
+                println!("{} You played with {}! So much fun! {}", style("🎮").bold(), style(&nybbler.name).bold().yellow(), style("🎮").bold());
+                for _ in 0..3 {
+                    thread::sleep(Duration::from_millis(300));
+                    term.clear_last_lines(1)?;
+                    println!("{} Wheee! {} is having fun! {}", style("🎯").bold(), style(&nybbler.name).bold().yellow(), style("🎯").bold());
+                    thread::sleep(Duration::from_millis(300));
+                    term.clear_last_lines(1)?;
+                    println!("{} Bouncing around with joy! {}", style("🏀").bold(), style("🏀").bold());
+                }
             },
             2 => {
                 nybbler.sleep();
-                println!("{} took a nap and feels refreshed!", nybbler.name);
+                println!("{} {} took a nap and feels refreshed! {}", style("💤").bold(), style(&nybbler.name).bold().yellow(), style("💤").bold());
+                for _ in 0..3 {
+                    thread::sleep(Duration::from_millis(400));
+                    term.clear_last_lines(1)?;
+                    println!("{} Zzz... {} is sleeping soundly... {}", style("😴").bold(), style(&nybbler.name).bold().yellow(), style("😴").bold());
+                    thread::sleep(Duration::from_millis(400));
+                    term.clear_last_lines(1)?;
+                    println!("{} Dreaming of treats and toys... {}", style("💭").bold(), style("💭").bold());
+                }
             },
             3 => {
                 nybbler.heal();
-                println!("You gave {} medicine and they're feeling better!", nybbler.name);
+                println!("{} You gave {} medicine and they're feeling better! {}", style("💊").bold(), style(&nybbler.name).bold().yellow(), style("💊").bold());
+                for _ in 0..3 {
+                    thread::sleep(Duration::from_millis(300));
+                    term.clear_last_lines(1)?;
+                    println!("{} {} is recovering... {}", style("🌡️").bold(), style(&nybbler.name).bold().yellow(), style("🌡️").bold());
+                    thread::sleep(Duration::from_millis(300));
+                    term.clear_last_lines(1)?;
+                    println!("{} All better now! Healthy and strong! {}", style("💪").bold(), style("💪").bold());
+                }
             },
             4 => {
                 if confirm_exit()? {
                     // Save the nybbler before exiting
                     match nybbler.save() {
                         Ok(_) => {
-                            println!("{} has been saved successfully!", nybbler.name);
+                            println!("{} {} has been saved successfully! {}", style("💾").bold(), style(&nybbler.name).bold().yellow(), style("💾").bold());
                             thread::sleep(Duration::from_millis(1000));
                         },
                         Err(e) => {
@@ -366,7 +451,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                     term.clear_screen()?;
-                    println!("Goodbye! See you soon!");
+                    println!("{}", style("
+      /\\_/\\
+     ( ^ω^ )
+     / >👋< \\
+    Goodbye!").bold().yellow());
+                    println!("{}", style("👋 Goodbye! See you soon! 👋").bold().green());
+                    println!("🌈 {} will be waiting for your return! 🌈", nybbler.name);
                     break;
                 }
             },
@@ -382,7 +473,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn confirm_exit() -> Result<bool, std::io::Error> {
     let confirm = dialoguer::Confirm::new()
-        .with_prompt("Are you sure you want to exit?")
+        .with_prompt("🥺 Are you really sure you want to leave? Your Nybbler will miss you! 🥺")
         .default(false)
         .interact()?;
 
